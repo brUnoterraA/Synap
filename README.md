@@ -1,36 +1,107 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Synap
 
-## Getting Started
+Plataforma de estudos para vestibulares e concursos: teoria, questões reais (múltipla escolha e dissertativas) e revisão com repetição espaçada.
 
-First, run the development server:
+> 🚧 Em desenvolvimento. Este repositório contém a base do projeto; as funcionalidades estão no [roadmap](#roadmap).
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+## Stack
+
+| Camada | Tecnologia |
+|---|---|
+| Framework | Next.js 15 (App Router) + TypeScript |
+| UI | Tailwind CSS 4 + shadcn/ui |
+| Banco | PostgreSQL (Neon) + Drizzle ORM |
+| Autenticação | Better Auth (e-mail/senha e Google) |
+| Repetição espaçada | [FSRS](https://github.com/open-spaced-repetition/ts-fsrs) |
+| Testes | Vitest + Playwright |
+| CI / Deploy | GitHub Actions + Vercel |
+
+## Arquitetura
+
+```
+src/
+├── app/                 # rotas Next.js (páginas e API)
+│   └── api/auth/        # endpoints do Better Auth
+├── components/ui/       # componentes shadcn/ui
+├── db/
+│   ├── schema/          # tabelas (auth + estudo)
+│   └── index.ts         # cliente Drizzle/Neon
+└── lib/
+    ├── auth.ts          # configuração do Better Auth
+    ├── srs/             # repetição espaçada (wrapper do FSRS)
+    └── study/           # diagnóstico de desempenho e correção de dissertativas
+drizzle/                 # migrations SQL
+e2e/                     # testes Playwright
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### Modelo de dados
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```mermaid
+erDiagram
+    subjects ||--o{ topics : tem
+    topics ||--o{ questions : tem
+    user ||--o{ attempts : faz
+    questions ||--o{ attempts : recebe
+    user ||--o{ cards : estuda
+    questions ||--o{ cards : vira
+    cards ||--o{ review_logs : registra
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- **questions**: múltipla escolha (`options`, `correct_option`) ou dissertativa (`expected_answer`, `rubric`), com banca/vestibular, ano e fonte.
+- **attempts**: cada resposta do aluno, usada no diagnóstico.
+- **cards / review_logs**: estado do FSRS por aluno e questão, e histórico de revisões.
 
-## Learn More
+### Diagnóstico e correção
 
-To learn more about Next.js, take a look at the following resources:
+`src/lib/study` expõe duas funções com assinaturas assíncronas:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- `analisarDesempenho(tentativas)`: taxa de acerto por tópico, pontos fracos (5+ questões e menos de 60% de acerto) e recomendações.
+- `corrigirDissertativa(entrada)`: nota ponderada pela rubrica a partir da autoavaliação do aluno.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Hoje funcionam por regras. A ideia é trocar a implementação por IA no futuro sem mudar quem as usa.
 
-## Deploy on Vercel
+## Rodando localmente
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Requisitos: Node 22+ e um banco Postgres (o plano grátis do [Neon](https://neon.tech) serve).
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```bash
+git clone https://github.com/brUnoterraA/Synap.git
+cd Synap
+npm install
+cp .env.example .env    # preencha DATABASE_URL e BETTER_AUTH_SECRET
+npm run db:migrate
+npm run dev
+```
+
+| Script | Descrição |
+|---|---|
+| `npm run dev` | servidor de desenvolvimento |
+| `npm test` | testes unitários (Vitest) |
+| `npm run test:e2e` | testes de ponta a ponta (Playwright) |
+| `npm run lint` / `npm run typecheck` | ESLint e TypeScript |
+| `npm run db:generate` | gera migration a partir do schema |
+| `npm run db:migrate` | aplica migrations |
+| `npm run db:studio` | interface visual do banco |
+
+## Deploy (grátis)
+
+1. Crie um projeto no [Neon](https://neon.tech) e copie a connection string.
+2. Importe o repositório na [Vercel](https://vercel.com/new).
+3. Configure as variáveis de ambiente do `.env.example` (com `BETTER_AUTH_URL` apontando para a URL da Vercel).
+4. Rode `npm run db:migrate` localmente apontando para o banco do Neon.
+
+## Roadmap
+
+- [x] Base do projeto: banco, autenticação, FSRS, testes e CI
+- [ ] Telas de login e cadastro
+- [ ] Banco inicial de questões (uma matéria do ENEM)
+- [ ] Resolver questões de múltipla escolha
+- [ ] Dissertativas com autoavaliação por rubrica
+- [ ] Revisão diária com FSRS
+- [ ] Painel de desempenho e pontos fracos
+- [ ] Conteúdo teórico por tópico
+- [ ] Tutor com IA: correção de dissertativas e plano de estudos personalizado
+
+## Licença
+
+[MIT](LICENSE)
